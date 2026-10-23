@@ -3,9 +3,12 @@ import { NestFactory } from '@nestjs/core';
 import type { ConfigType } from '@nestjs/config';
 import { appConfig } from '@config/app.config';
 import { AppModule } from './app.module';
+import { Logger as PinoLogger } from 'nestjs-pino';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(PinoLogger));
+
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY); // lấy config ngoài DI
 
   app.setGlobalPrefix('api'); // (1)
