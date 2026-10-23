@@ -1,10 +1,12 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "rules": {
-    "typescript/no-explicit-any": "warn",
-    "typescript/no-floating-promises": "warn"
+  "plugins": ["typescript", "unicorn", "oxc", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
   },
-  "env": {
-    "node": true
-  }
+  "rules": {
+    "typescript/no-explicit-any": "warn"
+  },
+  "ignorePatterns": ["dist", "node_modules"]
 }
