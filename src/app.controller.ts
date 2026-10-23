@@ -1,6 +1,6 @@
-import { Controller, Get, Inject } from '@nestjs/common';
+import { Controller, Get, Inject, Version } from '@nestjs/common';
 import { AppService } from './app.service';
-import { appConfig } from './config/app.config';
+import { appConfig } from '@config/app.config';
 import type { ConfigType } from '@nestjs/config';
 
 @Controller() // mọi route trong class này bắt đầu từ "/"
@@ -18,5 +18,11 @@ export class AppController {
   @Get('ping')
   ping() {
     return { status: 'ok', app: this.app.name, env: this.app.env };
+  }
+
+  @Get('ping')
+  @Version('2')
+  pingV2() {
+    return { status: 'ok', version: 2, uptime: process.uptime() };
   }
 }
