@@ -16,4 +16,6 @@ export const appConfig = registerAs('app', () => ({
   port: Number(process.env.PORT ?? 3000),
   name: process.env.APP_NAME as string,
   corsOrigins: (process.env.CORS_ORIGINS ?? '').split(','),
+  swaggerEnabled: (process.env.SWAGGER_ENABLED ?? 'true') === 'true',
+  requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS ?? 10000),
 }));

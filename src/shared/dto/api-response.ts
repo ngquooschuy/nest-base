@@ -1,19 +1,14 @@
-export interface PageMeta {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
+import { PageMetaDto } from './page-meta.dto';
 
 export interface Paginated<T> {
   items: T[];
-  meta: PageMeta;
+  meta: PageMetaDto;
 }
 
 export interface ApiSuccess<T> {
   success: true;
   data: T;
-  meta?: PageMeta;
+  meta?: PageMetaDto;
   timestamp: string;
 }
 

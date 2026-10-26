@@ -1,4 +1,4 @@
-import { PartialType } from '@nestjs/mapped-types';
+import { PartialType } from '@nestjs/swagger';
 import { CreateUserDto } from './create-user.dto';
 
 // Mọi field đều trở thành optional nhưng vẫn giữ nguyên các rule validate

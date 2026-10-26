@@ -7,6 +7,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { appConfig } from '@config/app.config';
 import { ConfigType } from '@nestjs/config';
 import { loggerConfig } from './logger/logger.config';
+import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
 @Module({
   imports: [
     LoggerModule.forRootAsync({
@@ -17,6 +18,7 @@ import { loggerConfig } from './logger/logger.config';
   providers: [
     { provide: APP_PIPE, useFactory: createValidationPipe },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    { provide: APP_INTERCEPTOR, useClass: TimeoutInterceptor },
     { provide: APP_INTERCEPTOR, useClass: TransformResponseInterceptor },
   ],
 })

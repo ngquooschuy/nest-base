@@ -48,4 +48,10 @@ export class AppController {
     if (type === 'http') throw new ForbiddenException();
     throw new Error('Boom! Lỗi không lường trước');
   }
+
+  @Get('slow')
+  async slow() {
+    await new Promise((r) => setTimeout(r, 5000));
+    return 'done';
+  }
 }

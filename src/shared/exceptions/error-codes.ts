@@ -11,4 +11,5 @@ export enum ErrorCode {
   // Lỗi nghiệp vụ, thêm dần theo từng module
   USER_NOT_FOUND = 'USER_NOT_FOUND',
   EMAIL_ALREADY_EXISTS = 'EMAIL_ALREADY_EXISTS',
+  REQUEST_TIMEOUT = 'REQUEST_TIMEOUT',
 }

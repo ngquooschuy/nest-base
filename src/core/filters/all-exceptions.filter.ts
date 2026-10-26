@@ -26,6 +26,8 @@ function codeFromStatus(status: number): ErrorCode {
       return ErrorCode.NOT_FOUND;
     case 409:
       return ErrorCode.CONFLICT;
+    case 408:
+      return ErrorCode.REQUEST_TIMEOUT;
     case 429:
       return ErrorCode.TOO_MANY_REQUESTS;
     default:

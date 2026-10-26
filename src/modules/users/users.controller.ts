@@ -1,35 +1,40 @@
+import { randomUUID } from 'node:crypto';
+import { ApiTags } from '@nestjs/swagger';
 import {
-  Body,
-  Controller,
-  Get,
-  Logger,
-  Param,
-  ParseUUIDPipe,
-  Patch,
-  Post,
-  Query,
-} from '@nestjs/common';
+  ApiOkWrapped,
+  ApiPaginatedResponse,
+} from '@shared/decorators/api-response.decorator';
+import type { Paginated } from '@shared/dto/api-response';
+import { UserResponseDto } from './dto/user-response.dto';
+import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { PaginationQueryDto } from '@shared/dto/pagination-query.dto';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 
+@ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  private readonly logger = new Logger(UsersController.name);
+  /** Lấy danh sách user có phân trang */
+  @Get()
+  @ApiPaginatedResponse(UserResponseDto)
+  findAll(@Query() query: PaginationQueryDto): Paginated<UserResponseDto> {
+    const items: UserResponseDto[] = [
+      {
+        id: randomUUID(),
+        email: 'huy@example.com',
+        fullName: 'Huy',
+        createdAt: new Date(),
+      },
+    ];
+    return {
+      items,
+      meta: { page: query.page, limit: query.limit, total: 1, totalPages: 1 },
+    };
+  }
 
+  /** Tạo user mới */
   @Post()
+  @ApiOkWrapped(UserResponseDto)
   create(@Body() dto: CreateUserDto) {
     return { received: dto, isInstance: dto instanceof CreateUserDto };
-  }
-
-  @Get()
-  findAll(@Query() query: PaginationQueryDto) {
-    this.logger.log(`Finding users page=${query.page} limit=${query.limit}`);
-    return { query, pageType: typeof query.page };
-  }
-
-  @Patch(':id')
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
-    return { id, dto };
   }
 }

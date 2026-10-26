@@ -4,6 +4,7 @@ import type { ConfigType } from '@nestjs/config';
 import { appConfig } from '@config/app.config';
 import { AppModule } from './app.module';
 import { Logger as PinoLogger } from 'nestjs-pino';
+import { setupSwagger } from '@core/swagger/swagger.setup';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -16,6 +17,7 @@ async function bootstrap() {
   app.enableCors({ origin: config.corsOrigins, credentials: true }); // (3)
   app.enableShutdownHooks(); // (4)
 
+  setupSwagger(app, config);
   await app.listen(config.port);
   Logger.log(
     `🏃‍♂️${config.name} [${config.env}] is running at: http://localhost:${config.port}/api/v1`,
