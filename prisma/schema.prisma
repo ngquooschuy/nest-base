@@ -20,33 +20,49 @@ enum Role {
 }
 
 model User {
-  id        String    @id @default(uuid(7)) @db.Uuid
-  email     String
-  password  String
-  fullName  String    @map("full_name")
-  age       Int?
-  role      Role      @default(USER)
-  createdAt DateTime  @default(now()) @map("created_at")
-  updatedAt DateTime  @updatedAt @map("updated_at")
-  deletedAt DateTime? @map("deleted_at")
-  sessions  Session[]
+  id             String          @id @default(uuid(7)) @db.Uuid
+  email          String
+  password       String
+  fullName       String          @map("full_name")
+  age            Int?
+  role           Role            @default(USER)
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  deletedAt      DateTime?       @map("deleted_at")
+  sessions       Session[]
+  passwordResets PasswordReset[]
 
   @@unique([email], where: raw("deleted_at IS NULL")) // chỉ unique với user chưa xóa
   @@index([deletedAt])
   @@map("users")
 }
 
+model PasswordReset {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("password_resets")
+}
+
 model Session {
-  id         String    @id @db.Uuid
-  userId     String    @map("user_id") @db.Uuid
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @map("token_hash")
-  userAgent  String?   @map("user_agent")
-  ip         String?
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  lastUsedAt DateTime  @default(now()) @map("last_used_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id                String    @id @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash         String    @map("token_hash")
+  userAgent         String?   @map("user_agent")
+  ip                String?
+  expiresAt         DateTime  @map("expires_at")
+  revokedAt         DateTime? @map("revoked_at")
+  lastUsedAt        DateTime  @default(now()) @map("last_used_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  previousTokenHash String?   @map("previous_token_hash")
+  rotatedAt         DateTime? @map("rotated_at")
 
   @@index([userId])
   @@map("sessions")

@@ -8,6 +8,7 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 import { SessionsModule } from '@modules/sessions/sessions.module';
+import { RolesGuard } from '@core/guards/roles.guard';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { SessionsModule } from '@modules/sessions/sessions.module';
     AuthService,
     HashService,
     { provide: APP_GUARD, useClass: JwtAuthGuard }, // khóa TOÀN BỘ app
+    { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
 export class AuthModule {}

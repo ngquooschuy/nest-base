@@ -6,12 +6,21 @@ import { AppModule } from './app.module';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { setupSwagger } from '@core/swagger/swagger.setup';
 import cookieParser from 'cookie-parser';
+import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   app.useLogger(app.get(PinoLogger));
 
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY); // lấy config ngoài DI
+
+  app.use(
+    helmet({
+      // CSP chủ yếu bảo vệ trang HTML. API trả JSON nên chỉ bật CSP ở production;
+      // tắt ở dev để Swagger UI không bị chặn script
+      contentSecurityPolicy: config.env === 'production' ? undefined : false,
+    }),
+  );
 
   app.setGlobalPrefix('api'); // (1)
   app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' }); // (2)

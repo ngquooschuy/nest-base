@@ -24,6 +24,10 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import type { AuthResult } from './types/auth-result';
 import type { ClientMeta } from './types/jwt-payload';
+import { Auth } from '@shared/decorators/auth.decorator';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 const REFRESH_COOKIE = 'refresh_token';
 
@@ -107,6 +111,36 @@ export class AuthController {
   @ApiOkWrapped(UserResponseDto)
   me(@CurrentUser('sub') userId: string) {
     return this.auth.me(userId);
+  }
+
+  @Auth()
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkWrapped(AuthResponseDto)
+  async changePassword(
+    @CurrentUser('sub') userId: string,
+    @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respond(
+      res,
+      await this.auth.changePassword(userId, dto, this.meta(req)),
+    );
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.auth.forgotPassword(dto.email);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.auth.resetPassword(dto);
   }
 
   // ===== helpers =====

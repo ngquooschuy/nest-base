@@ -1,4 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { Role, type Prisma } from '@generated/prisma/client';
+import type { JwtPayload } from '@modules/auth/types/jwt-payload';
 import type { Paginated } from '@shared/dto/api-response';
 import { BusinessException } from '@shared/exceptions/business.exception';
 import { ErrorCode } from '@shared/exceptions/error-codes';
@@ -35,7 +37,8 @@ export class UsersService {
     };
   }
 
-  async findOne(id: string): Promise<UserResponseDto> {
+  async findOne(actor: JwtPayload, id: string): Promise<UserResponseDto> {
+    this.assertCanManage(actor, id);
     return toUserResponse(await this.getOrThrow(id));
   }
 
@@ -62,7 +65,12 @@ export class UsersService {
     }
   }
 
-  async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
+  async update(
+    actor: JwtPayload,
+    id: string,
+    dto: UpdateUserDto,
+  ): Promise<UserResponseDto> {
+    this.assertCanManage(actor, id);
     const current = await this.getOrThrow(id);
     const { password, email, ...rest } = dto;
 
@@ -89,7 +97,24 @@ export class UsersService {
     }
   }
 
-  async remove(id: string): Promise<void> {
+  async changeRole(
+    actor: JwtPayload,
+    id: string,
+    role: Role,
+  ): Promise<UserResponseDto> {
+    if (actor.sub === id) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Không thể tự đổi role của chính mình',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+    await this.getOrThrow(id);
+    return toUserResponse(await this.repo.update(id, { role }));
+  }
+
+  async remove(actor: JwtPayload, id: string): Promise<void> {
+    this.assertCanManage(actor, id);
     await this.getOrThrow(id);
     await this.prisma.$transaction(async (tx) => {
       await this.repo.softDelete(id, tx);
@@ -107,7 +132,23 @@ export class UsersService {
     return this.repo.findById(id);
   }
 
+  /** Đặt mật khẩu mới (đã tự hash). Có thể chạy trong transaction. */
+  async setPassword(id: string, plain: string, db?: Prisma.TransactionClient) {
+    await this.repo.update(id, { password: await this.hash.hash(plain) }, db);
+  }
+
   // ===== helpers =====
+  /** ADMIN thao tác được với mọi user; USER chỉ thao tác được với chính mình */
+  private assertCanManage(actor: JwtPayload, targetId: string) {
+    if (actor.role !== Role.ADMIN && actor.sub !== targetId) {
+      throw new BusinessException(
+        ErrorCode.FORBIDDEN,
+        'Bạn chỉ có thể thao tác với tài khoản của mình',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+  }
+
   private async getOrThrow(id: string) {
     const user = await this.repo.findById(id);
     if (!user) {

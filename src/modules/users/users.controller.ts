@@ -11,56 +11,80 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { Role } from '@generated/prisma/client';
+import type { JwtPayload } from '@modules/auth/types/jwt-payload';
 import {
   ApiOkWrapped,
   ApiPaginatedResponse,
 } from '@shared/decorators/api-response.decorator';
+import { Auth } from '@shared/decorators/auth.decorator';
+import { CurrentUser } from '@shared/decorators/current-user.decorator';
+import { ChangeRoleDto } from './dto/change-role.dto';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UserResponseDto } from './dto/user-response.dto';
 import { UsersQueryDto } from './dto/users-query.dto';
 import { UsersService } from './users.service';
 
-@ApiBearerAuth()
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  /** Danh sách user: phân trang, tìm kiếm, sắp xếp */
   @Get()
+  @Auth(Role.ADMIN) // chỉ admin được xem danh sách
   @ApiPaginatedResponse(UserResponseDto)
   findAll(@Query() query: UsersQueryDto) {
     return this.usersService.findAll(query);
   }
 
-  /** Chi tiết một user */
   @Get(':id')
+  @Auth() // ai đăng nhập cũng gọi được, service kiểm tra ownership
   @ApiOkWrapped(UserResponseDto)
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.findOne(id);
+  findOne(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.findOne(actor, id);
   }
 
-  /** Tạo user */
   @Post()
+  @Auth(Role.ADMIN) // người dùng tự đăng ký qua /auth/register
   @ApiOkWrapped(UserResponseDto)
   create(@Body() dto: CreateUserDto) {
     return this.usersService.create(dto);
   }
 
-  /** Cập nhật một phần */
   @Patch(':id')
+  @Auth()
   @ApiOkWrapped(UserResponseDto)
-  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
-    return this.usersService.update(id, dto);
+  update(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateUserDto,
+  ) {
+    return this.usersService.update(actor, id, dto);
   }
 
-  /** Xóa mềm */
+  @Patch(':id/role')
+  @Auth(Role.ADMIN)
+  @ApiOkWrapped(UserResponseDto)
+  changeRole(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ChangeRoleDto,
+  ) {
+    return this.usersService.changeRole(actor, id, dto.role);
+  }
+
   @Delete(':id')
+  @Auth(Role.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiNoContentResponse()
-  remove(@Param('id', ParseUUIDPipe) id: string) {
-    return this.usersService.remove(id);
+  remove(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.usersService.remove(actor, id);
   }
 }

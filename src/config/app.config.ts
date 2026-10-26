@@ -18,4 +18,5 @@ export const appConfig = registerAs('app', () => ({
   corsOrigins: (process.env.CORS_ORIGINS ?? '').split(','),
   swaggerEnabled: (process.env.SWAGGER_ENABLED ?? 'true') === 'true',
   requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS ?? 10000),
+  frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:4200',
 }));

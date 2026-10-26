@@ -1,17 +1,21 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { appConfig } from '@config/app.config';
 import { jwtConfig } from '@config/jwt.config';
 import type { User } from '@generated/prisma/client';
+import { PrismaService } from '@infra/database/prisma.service';
 import { SessionsRepository } from '@modules/sessions/sessions.repository';
 import { toUserResponse } from '@modules/users/users.mapper';
 import { UsersService } from '@modules/users/users.service';
 import { BusinessException } from '@shared/exceptions/business.exception';
 import { ErrorCode } from '@shared/exceptions/error-codes';
 import { HashService } from '@shared/services/hash.service';
+import type { ChangePasswordDto } from './dto/change-password.dto';
 import type { LoginDto } from './dto/login.dto';
 import type { RegisterDto } from './dto/register.dto';
+import type { ResetPasswordDto } from './dto/reset-password.dto';
 import type { AuthResult } from './types/auth-result';
 import type {
   ClientMeta,
@@ -22,6 +26,8 @@ import type {
 // Hash giả để so sánh khi email không tồn tại → thời gian phản hồi luôn như nhau
 const DUMMY_HASH =
   '$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRzb21lc2FsdA$Zm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFyZm9vYmFy';
+
+const RESET_TTL_MS = 15 * 60 * 1000;
 
 const sha256 = (value: string) =>
   createHash('sha256').update(value).digest('hex');
@@ -35,7 +41,9 @@ export class AuthService {
     private readonly sessions: SessionsRepository,
     private readonly hash: HashService,
     private readonly jwt: JwtService,
+    private readonly prisma: PrismaService,
     @Inject(jwtConfig.KEY) private readonly cfg: ConfigType<typeof jwtConfig>,
+    @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
   async register(dto: RegisterDto, meta: ClientMeta = {}): Promise<AuthResult> {
@@ -59,6 +67,77 @@ export class AuthService {
       );
     }
     return this.startSession(user, meta);
+  }
+
+  async changePassword(
+    userId: string,
+    dto: ChangePasswordDto,
+    meta: ClientMeta = {},
+  ): Promise<AuthResult> {
+    const user = await this.users.findEntityById(userId);
+    if (
+      !user ||
+      !(await this.hash.verify(user.password, dto.currentPassword))
+    ) {
+      throw new BusinessException(
+        ErrorCode.INVALID_CREDENTIALS,
+        'Mật khẩu hiện tại không đúng',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    await this.users.setPassword(userId, dto.newPassword);
+    await this.sessions.revokeAllByUser(userId); // đăng xuất MỌI thiết bị khác
+    return this.startSession(user, meta); // cấp session mới cho thiết bị hiện tại
+  }
+
+  async forgotPassword(email: string): Promise<void> {
+    const user = await this.users.findForAuth(email);
+    if (!user) return; // im lặng: KHÔNG tiết lộ email có tồn tại hay không
+
+    const token = randomBytes(32).toString('base64url'); // 256 bit ngẫu nhiên → SHA-256 là đủ (Bài 13)
+
+    await this.prisma.$transaction([
+      // vô hiệu hóa các link reset cũ còn hiệu lực
+      this.prisma.passwordReset.updateMany({
+        where: { userId: user.id, usedAt: null },
+        data: { usedAt: new Date() },
+      }),
+      this.prisma.passwordReset.create({
+        data: {
+          userId: user.id,
+          tokenHash: sha256(token),
+          expiresAt: new Date(Date.now() + RESET_TTL_MS),
+        },
+      }),
+    ]);
+
+    const link = `${this.app.frontendUrl}/reset-password?token=${token}`;
+    // TODO Sprint 5: gửi email qua queue. Tạm thời chỉ log ở môi trường dev:
+    if (this.app.env !== 'production') {
+      this.logger.log(`[DEV] Reset link for ${user.email}: ${link}`);
+    }
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const record = await this.prisma.passwordReset.findUnique({
+      where: { tokenHash: sha256(dto.token) },
+    });
+    if (!record || record.usedAt || record.expiresAt < new Date()) {
+      throw this.invalidResetToken();
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // compare-and-swap: chỉ một request được dùng token này
+      const { count } = await tx.passwordReset.updateMany({
+        where: { id: record.id, usedAt: null },
+        data: { usedAt: new Date() },
+      });
+      if (count !== 1) throw this.invalidResetToken();
+
+      await this.users.setPassword(record.userId, dto.newPassword, tx);
+      await this.sessions.revokeAllByUser(record.userId, tx);
+    });
   }
 
   async me(userId: string) {
@@ -196,5 +275,13 @@ export class AuthService {
 
   private unauthorized(code: ErrorCode, message: string) {
     return new BusinessException(code, message, HttpStatus.UNAUTHORIZED);
+  }
+
+  private invalidResetToken() {
+    return new BusinessException(
+      ErrorCode.TOKEN_INVALID,
+      'Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn',
+      HttpStatus.BAD_REQUEST,
+    );
   }
 }
