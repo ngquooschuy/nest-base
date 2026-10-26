@@ -5,6 +5,7 @@ import { appConfig } from '@config/app.config';
 import { AppModule } from './app.module';
 import { Logger as PinoLogger } from 'nestjs-pino';
 import { setupSwagger } from '@core/swagger/swagger.setup';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
@@ -18,6 +19,7 @@ async function bootstrap() {
   app.enableShutdownHooks(); // (4)
 
   setupSwagger(app, config);
+  app.use(cookieParser());
   await app.listen(config.port);
   Logger.log(
     `🏃‍♂️${config.name} [${config.env}] is running at: http://localhost:${config.port}/api/v1`,

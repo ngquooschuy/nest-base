@@ -7,9 +7,12 @@ import { HashService } from '@shared/services/hash.service';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
+import { SessionsModule } from '@modules/sessions/sessions.module';
+
 @Module({
   imports: [
     UsersModule, // dùng UsersService đã được export
+    SessionsModule, // dùng SessionsRepository
     JwtModule.register({}), // để trống: truyền secret riêng ở từng lần sign/verify (access ≠ refresh)
   ],
   controllers: [AuthController],

@@ -4,38 +4,101 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Inject,
   Post,
+  Req,
+  Res,
 } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+import type { Request, Response } from 'express';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { appConfig } from '@config/app.config';
+import { jwtConfig } from '@config/jwt.config';
+import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { ApiOkWrapped } from '@shared/decorators/api-response.decorator';
 import { CurrentUser } from '@shared/decorators/current-user.decorator';
 import { Public } from '@shared/decorators/public.decorator';
-import { UserResponseDto } from '@modules/users/dto/user-response.dto';
 import { AuthService } from './auth.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import type { AuthResult } from './types/auth-result';
+import type { ClientMeta } from './types/jwt-payload';
+
+const REFRESH_COOKIE = 'refresh_token';
 
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
+    @Inject(jwtConfig.KEY)
+    private readonly jwtCfg: ConfigType<typeof jwtConfig>,
+  ) {}
 
-  /** Đăng ký tài khoản */
   @Public()
   @Post('register')
   @ApiOkWrapped(AuthResponseDto)
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respond(res, await this.auth.register(dto, this.meta(req)));
   }
 
-  /** Đăng nhập */
   @Public()
   @Post('login')
-  @HttpCode(HttpStatus.OK) // POST mặc định trả 201; login không "tạo" tài nguyên nên trả 200
+  @HttpCode(HttpStatus.OK)
   @ApiOkWrapped(AuthResponseDto)
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.respond(res, await this.auth.login(dto, this.meta(req)));
+  }
+
+  /** Đổi refresh token (trong cookie) lấy cặp token mới */
+  @Public() // access token đã hết hạn thì mới cần gọi route này, nên không thể bắt access token
+  @Post('refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOkWrapped(AuthResponseDto)
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      return this.respond(
+        res,
+        await this.auth.refresh(req.cookies?.[REFRESH_COOKIE]),
+      );
+    } catch (e) {
+      this.clearCookie(res); // refresh thất bại thì dọn cookie hỏng
+      throw e;
+    }
+  }
+
+  /** Đăng xuất thiết bị hiện tại */
+  @Public()
+  @Post('logout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    await this.auth.logout(req.cookies?.[REFRESH_COOKIE]);
+    this.clearCookie(res);
+  }
+
+  /** Đăng xuất mọi thiết bị */
+  @ApiBearerAuth()
+  @Post('logout-all')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async logoutAll(
+    @CurrentUser('sub') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.auth.logoutAll(userId);
+    this.clearCookie(res);
   }
 
   /** Thông tin người dùng hiện tại */
@@ -44,5 +107,25 @@ export class AuthController {
   @ApiOkWrapped(UserResponseDto)
   me(@CurrentUser('sub') userId: string) {
     return this.auth.me(userId);
+  }
+
+  // ===== helpers =====
+  private respond(res: Response, { refreshToken, ...body }: AuthResult) {
+    res.cookie(REFRESH_COOKIE, refreshToken, {
+      httpOnly: true, // JavaScript KHÔNG đọc được → XSS không lấy cắp được
+      secure: this.app.env === 'production', // chỉ gửi qua HTTPS (localhost dev thì tắt)
+      sameSite: 'strict', // trang web khác không thể kích hoạt gửi cookie → chống CSRF
+      path: '/api/v1/auth', // cookie CHỈ được gửi tới các route auth
+      maxAge: this.jwtCfg.refreshTtl * 1000,
+    });
+    return body; // body chỉ còn accessToken, expiresIn, user
+  }
+
+  private clearCookie(res: Response) {
+    res.clearCookie(REFRESH_COOKIE, { path: '/api/v1/auth' });
+  }
+
+  private meta(req: Request): ClientMeta {
+    return { userAgent: req.headers['user-agent'], ip: req.ip };
   }
 }

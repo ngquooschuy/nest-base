@@ -11,12 +11,16 @@ import type { UsersQueryDto } from './dto/users-query.dto';
 import { toUserResponse } from './users.mapper';
 import { UsersRepository } from './users.repository';
 import { isUniqueViolation } from '@core/filters/prisma-error.mapper';
+import { PrismaService } from '@infra/database/prisma.service';
+import { SessionsRepository } from '@modules/sessions/sessions.repository';
 
 @Injectable()
 export class UsersService {
   constructor(
     private readonly repo: UsersRepository,
     private readonly hash: HashService,
+    private readonly prisma: PrismaService,
+    private readonly sessions: SessionsRepository,
   ) {}
 
   async findAll(q: UsersQueryDto): Promise<Paginated<UserResponseDto>> {
@@ -87,7 +91,10 @@ export class UsersService {
 
   async remove(id: string): Promise<void> {
     await this.getOrThrow(id);
-    await this.repo.softDelete(id);
+    await this.prisma.$transaction(async (tx) => {
+      await this.repo.softDelete(id, tx);
+      await this.sessions.revokeAllByUser(id, tx);
+    }); // cả hai cùng thành công, hoặc cùng rollback
   }
 
   /** CHỈ dùng nội bộ cho Auth: trả về entity CÓ password. Không bao giờ trả hàm này ra controller. */
