@@ -28,7 +28,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsRepository,
     private readonly cache: CacheService,
-  ) {}
+  ) { }
 
   async findAll(q: UsersQueryDto): Promise<Paginated<UserResponseDto>> {
     const v = await this.cache.version('users:list');
@@ -124,6 +124,9 @@ export class UsersService {
     }
     await this.getOrThrow(id);
     const updated = await this.repo.update(id, { role });
+
+    await this.sessions.revokeAllByUser(id);
+
     await this.invalidate(id);
     return toUserResponse(updated);
   }
