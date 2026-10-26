@@ -2,6 +2,10 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { HttpStatus, Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { InjectQueue } from '@nestjs/bullmq';
+import type { Queue } from 'bullmq';
+import { QUEUE } from '@infra/queue/queue.constants';
+import { MailQueue } from '@infra/mail/mail.queue';
 import { appConfig } from '@config/app.config';
 import { jwtConfig } from '@config/jwt.config';
 import type { User } from '@generated/prisma/client';
@@ -44,12 +48,23 @@ export class AuthService {
     private readonly prisma: PrismaService,
     @Inject(jwtConfig.KEY) private readonly cfg: ConfigType<typeof jwtConfig>,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
+    private readonly mailQueue: MailQueue,
+    @InjectQueue(QUEUE.AUTH)
+    private readonly authQueue: Queue<{ email: string }>,
   ) {}
 
   async register(dto: RegisterDto, meta: ClientMeta = {}): Promise<AuthResult> {
     const created = await this.users.create(dto);
-    const user = await this.users.findEntityById(created.id);
-    return this.startSession(user as User, meta);
+    const user = (await this.users.findEntityById(created.id)) as User;
+
+    // Email là "nice to have": Redis lỗi thì KHÔNG được làm hỏng việc đăng ký
+    this.mailQueue
+      .send(user.email, 'welcome', { fullName: user.fullName })
+      .catch((e) =>
+        this.logger.error(`Cannot enqueue welcome mail: ${String(e)}`),
+      );
+
+    return this.startSession(user, meta);
   }
 
   async login(dto: LoginDto, meta: ClientMeta = {}): Promise<AuthResult> {
@@ -91,14 +106,18 @@ export class AuthService {
     return this.startSession(user, meta); // cấp session mới cho thiết bị hiện tại
   }
 
-  async forgotPassword(email: string): Promise<void> {
+  /** Gọi từ controller: CHỈ đẩy job vào queue, không chạm DB */
+  async requestPasswordReset(email: string): Promise<void> {
+    await this.authQueue.add('forgot-password', { email: email.toLowerCase() });
+  }
+
+  /** Gọi từ worker: phần thân của forgotPassword cũ, chỉ thay đoạn log link bằng gửi mail */
+  async processPasswordReset(email: string): Promise<void> {
     const user = await this.users.findForAuth(email);
-    if (!user) return; // im lặng: KHÔNG tiết lộ email có tồn tại hay không
+    if (!user) return;
 
-    const token = randomBytes(32).toString('base64url'); // 256 bit ngẫu nhiên → SHA-256 là đủ (Bài 13)
-
+    const token = randomBytes(32).toString('base64url');
     await this.prisma.$transaction([
-      // vô hiệu hóa các link reset cũ còn hiệu lực
       this.prisma.passwordReset.updateMany({
         where: { userId: user.id, usedAt: null },
         data: { usedAt: new Date() },
@@ -112,11 +131,11 @@ export class AuthService {
       }),
     ]);
 
-    const link = `${this.app.frontendUrl}/reset-password?token=${token}`;
-    // TODO Sprint 5: gửi email qua queue. Tạm thời chỉ log ở môi trường dev:
-    if (this.app.env !== 'production') {
-      this.logger.log(`[DEV] Reset link for ${user.email}: ${link}`);
-    }
+    await this.mailQueue.send(user.email, 'passwordReset', {
+      fullName: user.fullName,
+      link: `${this.app.frontendUrl}/reset-password?token=${token}`,
+      minutes: RESET_TTL_MS / 60_000,
+    });
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
