@@ -5,5 +5,6 @@ export class UserResponseDto {
   email!: string;
   fullName!: string;
   age?: number;
+  role!: string;
   createdAt!: Date;
 }

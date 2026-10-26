@@ -1,40 +1,65 @@
-import { randomUUID } from 'node:crypto';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiOkWrapped,
   ApiPaginatedResponse,
 } from '@shared/decorators/api-response.decorator';
-import type { Paginated } from '@shared/dto/api-response';
-import { UserResponseDto } from './dto/user-response.dto';
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { PaginationQueryDto } from '@shared/dto/pagination-query.dto';
 import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
+import { UserResponseDto } from './dto/user-response.dto';
+import { UsersQueryDto } from './dto/users-query.dto';
+import { UsersService } from './users.service';
 
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  /** Lấy danh sách user có phân trang */
+  constructor(private readonly usersService: UsersService) {}
+
+  /** Danh sách user: phân trang, tìm kiếm, sắp xếp */
   @Get()
   @ApiPaginatedResponse(UserResponseDto)
-  findAll(@Query() query: PaginationQueryDto): Paginated<UserResponseDto> {
-    const items: UserResponseDto[] = [
-      {
-        id: randomUUID(),
-        email: 'huy@example.com',
-        fullName: 'Huy',
-        createdAt: new Date(),
-      },
-    ];
-    return {
-      items,
-      meta: { page: query.page, limit: query.limit, total: 1, totalPages: 1 },
-    };
+  findAll(@Query() query: UsersQueryDto) {
+    return this.usersService.findAll(query);
   }
 
-  /** Tạo user mới */
+  /** Chi tiết một user */
+  @Get(':id')
+  @ApiOkWrapped(UserResponseDto)
+  findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.findOne(id);
+  }
+
+  /** Tạo user */
   @Post()
   @ApiOkWrapped(UserResponseDto)
   create(@Body() dto: CreateUserDto) {
-    return { received: dto, isInstance: dto instanceof CreateUserDto };
+    return this.usersService.create(dto);
+  }
+
+  /** Cập nhật một phần */
+  @Patch(':id')
+  @ApiOkWrapped(UserResponseDto)
+  update(@Param('id', ParseUUIDPipe) id: string, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(id, dto);
+  }
+
+  /** Xóa mềm */
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse()
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.usersService.remove(id);
   }
 }
