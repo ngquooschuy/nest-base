@@ -9,5 +9,5 @@
     "typescript/no-explicit-any": "warn",
     "typescript/no-extraneous-class": ["warn", { "allowWithDecorator": true }]
   },
-  "ignorePatterns": ["dist", "node_modules"]
+  "ignorePatterns": ["dist", "node_modules", "src/generated"]
 }

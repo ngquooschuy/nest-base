@@ -6,6 +6,8 @@ import { validateEnv } from './config/env.validation';
 import { ConfigModule } from '@nestjs/config';
 import { CoreModule } from '@core/core.module';
 import { UsersModule } from './modules/users/users.module';
+import { databaseConfig } from '@config/database.config';
+import { PrismaModule } from '@infra/database/prisma.module';
 
 @Module({
   imports: [
@@ -13,9 +15,10 @@ import { UsersModule } from './modules/users/users.module';
       isGlobal: true, // ~ providedIn: 'root', module nào cũng inject được
       cache: true,
       validate: validateEnv,
-      load: [appConfig],
+      load: [appConfig, databaseConfig],
     }),
     CoreModule,
+    PrismaModule,
     UsersModule,
   ],
   controllers: [AppController],

@@ -24,7 +24,8 @@
       "@core/*": ["./src/core/*"],
       "@shared/*": ["./src/shared/*"],
       "@infra/*": ["./src/infrastructure/*"],
-      "@modules/*": ["./src/modules/*"]
+      "@modules/*": ["./src/modules/*"],
+      "@generated/*": ["./src/generated/*"]
     }
   }
 }
