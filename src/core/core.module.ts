@@ -8,11 +8,25 @@ import { appConfig } from '@config/app.config';
 import { ConfigType } from '@nestjs/config';
 import { loggerConfig } from './logger/logger.config';
 import { TimeoutInterceptor } from './interceptors/timeout.interceptor';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
+import { redisConfig } from '@config/redis.config';
+
 @Module({
   imports: [
     LoggerModule.forRootAsync({
       inject: [appConfig.KEY],
       useFactory: (app: ConfigType<typeof appConfig>) => loggerConfig(app),
+    }),
+    ThrottlerModule.forRootAsync({
+      inject: [appConfig.KEY, redisConfig.KEY],
+      useFactory: (
+        app: ConfigType<typeof appConfig>,
+        redis: ConfigType<typeof redisConfig>,
+      ) => ({
+        throttlers: [{ ttl: app.throttleTtlMs, limit: app.throttleLimit }], // mặc định 100 request / 60 giây / IP
+        storage: new ThrottlerStorageRedisService(redis.url),
+      }),
     }),
   ],
   providers: [

@@ -28,7 +28,9 @@ import { Auth } from '@shared/decorators/auth.decorator';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { Throttle } from '@nestjs/throttler';
 
+const STRICT = { default: { limit: 5, ttl: 60_000 } }; // 5 lần mỗi phút mỗi IP
 const REFRESH_COOKIE = 'refresh_token';
 
 @ApiTags('Auth')
@@ -53,6 +55,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(STRICT)
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOkWrapped(AuthResponseDto)
@@ -130,6 +133,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(STRICT)
   @Post('forgot-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
@@ -137,6 +141,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(STRICT)
   @Post('reset-password')
   @HttpCode(HttpStatus.NO_CONTENT)
   async resetPassword(@Body() dto: ResetPasswordDto) {

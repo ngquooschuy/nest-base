@@ -13,6 +13,7 @@ import type { ConfigType } from '@nestjs/config';
 import { BusinessException } from '@shared/exceptions/business.exception';
 import { ErrorCode } from '@shared/exceptions/error-codes';
 import { Public } from '@shared/decorators/public.decorator';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller() // mọi route trong class này bắt đầu từ "/"
 export class AppController {
@@ -28,6 +29,7 @@ export class AppController {
 
   @Get('ping')
   @Public()
+  @SkipThrottle()
   ping() {
     return { status: 'ok', app: this.app.name, env: this.app.env };
   }
@@ -35,6 +37,7 @@ export class AppController {
   @Get('ping')
   @Public()
   @Version('2')
+  @SkipThrottle()
   pingV2() {
     return { status: 'ok', version: 2, uptime: process.uptime() };
   }

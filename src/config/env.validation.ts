@@ -17,6 +17,10 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().min(32),
   JWT_REFRESH_TTL: z.coerce.number().int().positive().default(604800),
   FRONTEND_URL: z.string().url(),
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
+  REDIS_URL: z.string().url(),
+  THROTTLE_TTL_MS: z.coerce.number().int().positive().default(60000),
+  THROTTLE_LIMIT: z.coerce.number().int().positive().default(100),
 });
 
 export type Env = z.infer<typeof envSchema>;

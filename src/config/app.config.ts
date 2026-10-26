@@ -19,4 +19,7 @@ export const appConfig = registerAs('app', () => ({
   swaggerEnabled: (process.env.SWAGGER_ENABLED ?? 'true') === 'true',
   requestTimeoutMs: Number(process.env.REQUEST_TIMEOUT_MS ?? 10000),
   frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:4200',
+  trustProxy: Number(process.env.TRUST_PROXY ?? 0),
+  throttleTtlMs: Number(process.env.THROTTLE_TTL_MS ?? 60000),
+  throttleLimit: Number(process.env.THROTTLE_LIMIT ?? 100),
 }));

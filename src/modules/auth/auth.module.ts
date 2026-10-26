@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 
 import { SessionsModule } from '@modules/sessions/sessions.module';
 import { RolesGuard } from '@core/guards/roles.guard';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 @Module({
   imports: [
@@ -20,8 +21,10 @@ import { RolesGuard } from '@core/guards/roles.guard';
   providers: [
     AuthService,
     HashService,
-    { provide: APP_GUARD, useClass: JwtAuthGuard }, // khóa TOÀN BỘ app
-    { provide: APP_GUARD, useClass: RolesGuard },
+    // ⚠️ NƠI DUY NHẤT khai báo global guard. Thứ tự = thứ tự chạy.
+    { provide: APP_GUARD, useClass: ThrottlerGuard }, // 1. chặn spam trước, rẻ nhất
+    { provide: APP_GUARD, useClass: JwtAuthGuard }, // 2. xác thực
+    { provide: APP_GUARD, useClass: RolesGuard }, // 3. phân quyền
   ],
 })
 export class AuthModule {}

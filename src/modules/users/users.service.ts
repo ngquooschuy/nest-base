@@ -15,6 +15,10 @@ import { UsersRepository } from './users.repository';
 import { isUniqueViolation } from '@core/filters/prisma-error.mapper';
 import { PrismaService } from '@infra/database/prisma.service';
 import { SessionsRepository } from '@modules/sessions/sessions.repository';
+import { CacheService } from '@infra/cache/cache.service';
+
+const USER_TTL = 5 * 60_000; // 5 phút
+const LIST_TTL = 60_000; // 1 phút
 
 @Injectable()
 export class UsersService {
@@ -23,23 +27,30 @@ export class UsersService {
     private readonly hash: HashService,
     private readonly prisma: PrismaService,
     private readonly sessions: SessionsRepository,
+    private readonly cache: CacheService,
   ) {}
 
   async findAll(q: UsersQueryDto): Promise<Paginated<UserResponseDto>> {
-    const { items, total } = await this.repo.findMany({
-      ...toSkipTake(q.page, q.limit),
-      search: q.search,
-      orderBy: { [q.sortBy]: q.order },
+    const v = await this.cache.version('users:list');
+    const key = `users:list:v${v}:${q.page}:${q.limit}:${q.sortBy}:${q.order}:${q.search ?? ''}`;
+    return this.cache.getOrSet(key, LIST_TTL, async () => {
+      const { items, total } = await this.repo.findMany({
+        ...toSkipTake(q.page, q.limit),
+        search: q.search,
+        orderBy: { [q.sortBy]: q.order },
+      });
+      return {
+        items: items.map(toUserResponse),
+        meta: toPageMeta(q.page, q.limit, total),
+      };
     });
-    return {
-      items: items.map(toUserResponse),
-      meta: toPageMeta(q.page, q.limit, total),
-    };
   }
 
   async findOne(actor: JwtPayload, id: string): Promise<UserResponseDto> {
-    this.assertCanManage(actor, id);
-    return toUserResponse(await this.getOrThrow(id));
+    this.assertCanManage(actor, id); // ⚠️ kiểm tra quyền TRƯỚC khi đọc cache
+    return this.cache.getOrSet(`user:${id}`, USER_TTL, async () =>
+      toUserResponse(await this.getOrThrow(id)),
+    );
   }
 
   async create(dto: CreateUserDto): Promise<UserResponseDto> {
@@ -52,6 +63,7 @@ export class UsersService {
         email,
         password: await this.hash.hash(dto.password),
       });
+      await this.invalidate();
       return toUserResponse(user);
     } catch (e) {
       if (isUniqueViolation(e)) {
@@ -84,6 +96,7 @@ export class UsersService {
         ...(email ? { email: email.toLowerCase() } : {}),
         ...(password ? { password: await this.hash.hash(password) } : {}),
       });
+      await this.invalidate(id);
       return toUserResponse(user);
     } catch (e) {
       if (isUniqueViolation(e)) {
@@ -110,7 +123,9 @@ export class UsersService {
       );
     }
     await this.getOrThrow(id);
-    return toUserResponse(await this.repo.update(id, { role }));
+    const updated = await this.repo.update(id, { role });
+    await this.invalidate(id);
+    return toUserResponse(updated);
   }
 
   async remove(actor: JwtPayload, id: string): Promise<void> {
@@ -120,6 +135,7 @@ export class UsersService {
       await this.repo.softDelete(id, tx);
       await this.sessions.revokeAllByUser(id, tx);
     }); // cả hai cùng thành công, hoặc cùng rollback
+    await this.invalidate(id);
   }
 
   /** CHỈ dùng nội bộ cho Auth: trả về entity CÓ password. Không bao giờ trả hàm này ra controller. */
@@ -135,9 +151,17 @@ export class UsersService {
   /** Đặt mật khẩu mới (đã tự hash). Có thể chạy trong transaction. */
   async setPassword(id: string, plain: string, db?: Prisma.TransactionClient) {
     await this.repo.update(id, { password: await this.hash.hash(plain) }, db);
+    await this.invalidate(id);
   }
 
   // ===== helpers =====
+  // Gọi sau MỌI thao tác ghi: create, update, changeRole, remove, setPassword
+  private async invalidate(id?: string) {
+    await Promise.all([
+      this.cache.bump('users:list'),
+      id ? this.cache.del(`user:${id}`) : undefined,
+    ]);
+  }
   /** ADMIN thao tác được với mọi user; USER chỉ thao tác được với chính mình */
   private assertCanManage(actor: JwtPayload, targetId: string) {
     if (actor.role !== Role.ADMIN && actor.sub !== targetId) {

@@ -8,7 +8,9 @@ import { CoreModule } from '@core/core.module';
 import { UsersModule } from './modules/users/users.module';
 import { databaseConfig } from '@config/database.config';
 import { jwtConfig } from '@config/jwt.config';
+import { redisConfig } from '@config/redis.config';
 import { PrismaModule } from '@infra/database/prisma.module';
+import { AppCacheModule } from '@infra/cache/cache.module';
 import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
@@ -17,10 +19,11 @@ import { AuthModule } from './modules/auth/auth.module';
       isGlobal: true, // ~ providedIn: 'root', module nào cũng inject được
       cache: true,
       validate: validateEnv,
-      load: [appConfig, databaseConfig, jwtConfig],
+      load: [appConfig, databaseConfig, jwtConfig, redisConfig],
     }),
     CoreModule,
     PrismaModule,
+    AppCacheModule,
     UsersModule,
     AuthModule,
   ],

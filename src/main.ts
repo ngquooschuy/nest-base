@@ -7,12 +7,17 @@ import { Logger as PinoLogger } from 'nestjs-pino';
 import { setupSwagger } from '@core/swagger/swagger.setup';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+  });
   app.useLogger(app.get(PinoLogger));
 
   const config = app.get<ConfigType<typeof appConfig>>(appConfig.KEY); // lấy config ngoài DI
+
+  if (config.trustProxy > 0) app.set('trust proxy', config.trustProxy); // số tầng proxy đứng trước app
 
   app.use(
     helmet({
