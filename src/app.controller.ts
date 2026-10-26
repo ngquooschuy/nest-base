@@ -12,6 +12,7 @@ import { appConfig } from '@config/app.config';
 import type { ConfigType } from '@nestjs/config';
 import { BusinessException } from '@shared/exceptions/business.exception';
 import { ErrorCode } from '@shared/exceptions/error-codes';
+import { Public } from '@shared/decorators/public.decorator';
 
 @Controller() // mọi route trong class này bắt đầu từ "/"
 export class AppController {
@@ -26,11 +27,13 @@ export class AppController {
   }
 
   @Get('ping')
+  @Public()
   ping() {
     return { status: 'ok', app: this.app.name, env: this.app.env };
   }
 
   @Get('ping')
+  @Public()
   @Version('2')
   pingV2() {
     return { status: 'ok', version: 2, uptime: process.uptime() };

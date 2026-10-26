@@ -12,6 +12,10 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
+  JWT_ACCESS_SECRET: z.string().min(32), // secret ngắn thì từ chối khởi động
+  JWT_ACCESS_TTL: z.coerce.number().int().positive().default(900),
+  JWT_REFRESH_SECRET: z.string().min(32),
+  JWT_REFRESH_TTL: z.coerce.number().int().positive().default(604800),
 });
 
 export type Env = z.infer<typeof envSchema>;

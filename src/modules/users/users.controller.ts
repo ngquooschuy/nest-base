@@ -11,7 +11,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiNoContentResponse, ApiTags } from '@nestjs/swagger';
 import {
   ApiOkWrapped,
   ApiPaginatedResponse,
@@ -22,6 +22,7 @@ import { UserResponseDto } from './dto/user-response.dto';
 import { UsersQueryDto } from './dto/users-query.dto';
 import { UsersService } from './users.service';
 
+@ApiBearerAuth()
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {

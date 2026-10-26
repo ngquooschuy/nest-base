@@ -90,6 +90,16 @@ export class UsersService {
     await this.repo.softDelete(id);
   }
 
+  /** CHỈ dùng nội bộ cho Auth: trả về entity CÓ password. Không bao giờ trả hàm này ra controller. */
+  findForAuth(email: string) {
+    return this.repo.findByEmail(email.toLowerCase());
+  }
+
+  /** Lấy entity theo id, dùng cho /auth/me */
+  findEntityById(id: string) {
+    return this.repo.findById(id);
+  }
+
   // ===== helpers =====
   private async getOrThrow(id: string) {
     const user = await this.repo.findById(id);
