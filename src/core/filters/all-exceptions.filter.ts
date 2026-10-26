@@ -13,6 +13,7 @@ import { appConfig } from '@config/app.config';
 import type { ApiError } from '@shared/dto/api-response';
 import { BusinessException } from '@shared/exceptions/business.exception';
 import { ErrorCode } from '@shared/exceptions/error-codes';
+import { mapPrismaError } from './prisma-error.mapper';
 
 function codeFromStatus(status: number): ErrorCode {
   switch (status) {
@@ -83,6 +84,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
           details: exception.details,
         },
       };
+    }
+
+    // (1.5) Lỗi Prisma đã biết
+    const prismaError = mapPrismaError(exception);
+    if (prismaError) {
+      const { status, code, message } = prismaError;
+      return { status, error: { code, message } };
     }
 
     // (2) Lỗi HTTP có sẵn của Nest: NotFoundException, ForbiddenException...

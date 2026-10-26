@@ -4,9 +4,10 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider     = "prisma-client"
-  output       = "../src/generated/prisma"
-  moduleFormat = "cjs" // Nest mặc định chạy CommonJs
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  moduleFormat    = "cjs" // Nest mặc định chạy CommonJs
+  previewFeatures = ["partialIndexes"]
 }
 
 datasource db {
@@ -20,7 +21,7 @@ enum Role {
 
 model User {
   id        String    @id @default(uuid(7)) @db.Uuid
-  email     String    @unique
+  email     String
   password  String
   fullName  String    @map("full_name")
   age       Int?
@@ -29,6 +30,7 @@ model User {
   updatedAt DateTime  @updatedAt @map("updated_at")
   deletedAt DateTime? @map("deleted_at")
 
+  @@unique([email], where: raw("deleted_at IS NULL")) // chỉ unique với user chưa xóa
   @@index([deletedAt])
   @@map("users")
 }

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { Prisma } from '@generated/prisma/client';
 import { PrismaService } from '@infra/database/prisma.service';
-
+type Db = PrismaService | Prisma.TransactionClient;
 const notDeleted = { deletedAt: null } satisfies Prisma.UserWhereInput;
 
 interface FindManyParams {
@@ -15,12 +15,12 @@ interface FindManyParams {
 export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findById(id: string) {
-    return this.prisma.user.findFirst({ where: { id, ...notDeleted } });
+  findById(id: string, db: Db = this.prisma) {
+    return db.user.findFirst({ where: { id, ...notDeleted } });
   }
 
-  findByEmail(email: string) {
-    return this.prisma.user.findFirst({ where: { email, ...notDeleted } });
+  findByEmail(email: string, db: Db = this.prisma) {
+    return db.user.findFirst({ where: { email, ...notDeleted } });
   }
 
   async findMany({ skip, take, search, orderBy }: FindManyParams) {
@@ -44,18 +44,15 @@ export class UsersRepository {
     return { items, total };
   }
 
-  create(data: Prisma.UserCreateInput) {
-    return this.prisma.user.create({ data });
+  create(data: Prisma.UserCreateInput, db: Db = this.prisma) {
+    return db.user.create({ data });
   }
 
-  update(id: string, data: Prisma.UserUpdateInput) {
-    return this.prisma.user.update({ where: { id }, data });
+  update(id: string, data: Prisma.UserUpdateInput, db: Db = this.prisma) {
+    return db.user.update({ where: { id }, data });
   }
 
-  softDelete(id: string) {
-    return this.prisma.user.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+  softDelete(id: string, db: Db = this.prisma) {
+    return db.user.update({ where: { id }, data: { deletedAt: new Date() } });
   }
 }

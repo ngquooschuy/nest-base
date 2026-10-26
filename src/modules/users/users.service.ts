@@ -10,6 +10,7 @@ import type { UserResponseDto } from './dto/user-response.dto';
 import type { UsersQueryDto } from './dto/users-query.dto';
 import { toUserResponse } from './users.mapper';
 import { UsersRepository } from './users.repository';
+import { isUniqueViolation } from '@core/filters/prisma-error.mapper';
 
 @Injectable()
 export class UsersService {
@@ -38,12 +39,23 @@ export class UsersService {
     const email = dto.email.toLowerCase();
     await this.ensureEmailAvailable(email);
 
-    const user = await this.repo.create({
-      ...dto,
-      email,
-      password: await this.hash.hash(dto.password),
-    });
-    return toUserResponse(user);
+    try {
+      const user = await this.repo.create({
+        ...dto,
+        email,
+        password: await this.hash.hash(dto.password),
+      });
+      return toUserResponse(user);
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        throw new BusinessException(
+          ErrorCode.EMAIL_ALREADY_EXISTS,
+          'Email đã được sử dụng',
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw e;
+    }
   }
 
   async update(id: string, dto: UpdateUserDto): Promise<UserResponseDto> {
@@ -54,12 +66,23 @@ export class UsersService {
       await this.ensureEmailAvailable(email.toLowerCase());
     }
 
-    const user = await this.repo.update(id, {
-      ...rest,
-      ...(email ? { email: email.toLowerCase() } : {}),
-      ...(password ? { password: await this.hash.hash(password) } : {}),
-    });
-    return toUserResponse(user);
+    try {
+      const user = await this.repo.update(id, {
+        ...rest,
+        ...(email ? { email: email.toLowerCase() } : {}),
+        ...(password ? { password: await this.hash.hash(password) } : {}),
+      });
+      return toUserResponse(user);
+    } catch (e) {
+      if (isUniqueViolation(e)) {
+        throw new BusinessException(
+          ErrorCode.EMAIL_ALREADY_EXISTS,
+          'Email đã được sử dụng',
+          HttpStatus.CONFLICT,
+        );
+      }
+      throw e;
+    }
   }
 
   async remove(id: string): Promise<void> {
